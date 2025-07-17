@@ -1,143 +1,169 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Seat Booking - Film Hall</title>
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-    import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+  <title>Seat Booking</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 10px;
+    }
+    h2 {
+      margin-top: 0;
+    }
+    #movieDetails {
+      margin-bottom: 20px;
+    }
+    .seat {
+      width: 50px;
+      height: 50px;
+      margin: 5px;
+      display: inline-block;
+      text-align: center;
+      line-height: 50px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    .available { background-color: lightgreen; }
+    .booked { background-color: lightgray; pointer-events: none; }
+    .selected { background-color: orange; }
+    #seatsContainer {
+      max-width: 350px;
+      margin: auto;
+    }
+    #payBtn {
+      margin-top: 20px;
+      padding: 10px 20px;
+      font-size: 18px;
+    }
+  </style>
+</head>
+<body>
+  <div id="movieDetails">
+    <h2 id="title">Loading...</h2>
+    <p><strong>Showtime:</strong> <span id="showtime"></span></p>
+    <p><strong>Price:</strong> ₹<span id="price"></span></p>
+  </div>
 
+  <div id="seatsContainer"></div>
+
+  <button id="payBtn" style="display:none;">Pay & Download Ticket</button>
+
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+  <script>
     const firebaseConfig = {
-  apiKey: "AIzaSyCOEWNxz-PSgZd-iE19O8ykM4yCullRVAQ",
-  authDomain: "film-hall-booking.firebaseapp.com",
-  projectId: "film-hall-booking",
-  storageBucket: "film-hall-booking.firebasestorage.app",
-  messagingSenderId: "307732411395",
-  appId: "1:307732411395:web:44377a6f4f30259e7c0a36",
-  measurementId: "G-3HKF4JPPFT"
-}; 
+      apiKey: "AIzaSyCOEWNxz-PSgZd-iE19O8ykM4yCullRVAQ",
+      authDomain: "film-hall-booking.firebaseapp.com",
+      projectId: "film-hall-booking",
+      storageBucket: "film-hall-booking.appspot.com",
+      messagingSenderId: "1034311788406",
+      appId: "1:1034311788406:web:c6e196ab37d58584dc1860"
+    };
 
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
 
     const urlParams = new URLSearchParams(window.location.search);
     const movieId = urlParams.get("id");
-    const showtime = urlParams.get("showtime");
+    const titleEl = document.getElementById("title");
+    const showtimeEl = document.getElementById("showtime");
+    const priceEl = document.getElementById("price");
+    const seatsContainer = document.getElementById("seatsContainer");
+    const payBtn = document.getElementById("payBtn");
 
-    if (!movieId || !showtime) {
-      document.body.innerHTML = "<h3 style='color:red;'>Movie ID and Showtime missing in URL</h3>";
-    } else {
-      const movieTitle = document.getElementById("movieTitle");
-      const posterImg = document.getElementById("poster");
-      const showtimeText = document.getElementById("showtimeText");
-      const seatArea = document.getElementById("seatArea");
-      const paymentBtn = document.getElementById("payBtn");
+    let selectedSeat = null;
+    let seatPrice = 0;
+    let ticketTitle = "";
 
-      let selectedSeat = null;
-      let selectedPrice = 0;
-
-      async function loadMovie() {
-        const docRef = doc(db, "movies", movieId);
-        const docSnap = await getDoc(docRef);
-
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-
-          movieTitle.innerText = data.title;
-          posterImg.src = data.posterURL;
-          showtimeText.innerText = `Showtime: ${showtime}`;
-
-          // 🕒 Booking Lock Logic
-          const showTime24Hr = convertTo24Hr(showtime);
-          const showDateTime = new Date();
-          showDateTime.setDate(showDateTime.getDate() + 1); // Tomorrow
-          const [hr, min] = showTime24Hr.split(":");
-          showDateTime.setHours(parseInt(hr));
-          showDateTime.setMinutes(parseInt(min));
-          showDateTime.setSeconds(0);
-
-          const lockTime = new Date(showDateTime.getTime() - 2 * 60 * 60 * 1000);
-          const now = new Date();
-
-          if (now < new Date(new Date().setHours(12, 0, 0, 0))) {
-            document.getElementById("lockMsg").innerText = "Booking will open today at 12:00 PM.";
-            paymentBtn.disabled = true;
-            return;
-          }
-
-          if (now > lockTime) {
-            document.getElementById("lockMsg").innerText = "Booking closed 2 hours before showtime.";
-            paymentBtn.disabled = true;
-            return;
-          }
-
-          // ✅ Load seat layout
-          renderSeats(data.priceA, data.priceB);
-        }
+    async function loadMovie() {
+      if (!movieId) {
+        titleEl.textContent = "Invalid Movie ID!";
+        return;
       }
 
-      function renderSeats(priceA, priceB) {
-        for (let i = 1; i <= 50; i++) {
-          const seat = document.createElement("button");
-          seat.innerText = `A${i}`;
-          seat.style.margin = "5px";
-          seat.style.background = "#e0f7fa";
-          seat.onclick = () => selectSeat(`A${i}`, priceA);
-          seatArea.appendChild(seat);
-        }
-        seatArea.appendChild(document.createElement("br"));
-        for (let i = 1; i <= 50; i++) {
-          const seat = document.createElement("button");
-          seat.innerText = `B${i}`;
-          seat.style.margin = "5px";
-          seat.style.background = "#ffe0b2";
-          seat.onclick = () => selectSeat(`B${i}`, priceB);
-          seatArea.appendChild(seat);
-        }
+      const doc = await db.collection("movies").doc(movieId).get();
+      if (!doc.exists) {
+        titleEl.textContent = "Movie Not Found!";
+        return;
       }
 
-      function selectSeat(seatId, price) {
-        selectedSeat = seatId;
-        selectedPrice = price;
-        document.getElementById("selectedSeat").innerText = `Selected Seat: ${seatId} | ₹${price}`;
-        document.getElementById("payBtn").disabled = false;
+      const data = doc.data();
+      const showtime = data.showtime;
+      const price = data.price;
+      ticketTitle = data.title;
+      titleEl.textContent = ticketTitle;
+      showtimeEl.textContent = showtime;
+      priceEl.textContent = price;
+
+      // Booking logic (lock 2 hours before)
+      const now = new Date();
+      const tomorrow = new Date(now);
+      tomorrow.setDate(now.getDate() + 1);
+      const showHour = parseInt(showtime.replace("AM", "").replace("PM", "")) + (showtime.includes("PM") && showtime !== "12PM" ? 12 : 0);
+      const showDate = new Date(tomorrow.getFullYear(), tomorrow.getMonth(), tomorrow.getDate(), showHour, 0, 0);
+      const lockTime = new Date(showDate.getTime() - 2 * 60 * 60 * 1000);
+
+      if (now < new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12)) {
+        titleEl.textContent += " (Booking opens at 12PM today)";
+        return;
       }
 
-      window.makePayment = function () {
-        if (!selectedSeat) return alert("Please select a seat.");
-
-        // Redirect to Razorpay payment link based on seat type
-        let paymentLink = selectedSeat.startsWith("A")
-          ? "https://rzp.io/rzp/Q3W64IW9"
-          : "https://rzp.io/rzp/nQryg1Y";
-
-        // Optional: Append seat info in link or store to Firestore later
-        window.open(paymentLink, "_blank");
-
-        alert(`🎟️ Ticket booked for ${selectedSeat} at ₹${selectedPrice}`);
-      };
-
-      function convertTo24Hr(timeStr) {
-        const [time, modifier] = timeStr.split(/(?<=\d)(AM|PM)/);
-        let [hours, minutes] = time.split(":");
-        if (!minutes) minutes = "00";
-        if (modifier === "PM" && hours !== "12") hours = parseInt(hours) + 12;
-        if (modifier === "AM" && hours === "12") hours = "00";
-        return `${hours}:${minutes}`;
+      if (now > lockTime) {
+        titleEl.textContent += " (Booking closed)";
+        return;
       }
 
-      loadMovie();
+      renderSeats(price);
     }
+
+    function renderSeats(basePrice) {
+      seatsContainer.innerHTML = "";
+      for (let i = 1; i <= 100; i++) {
+        const seat = document.createElement("div");
+        seat.classList.add("seat", "available");
+        seat.textContent = i <= 50 ? `A${i}` : `B${i - 50}`;
+        seat.dataset.price = i <= 50 ? 50 : 100;
+        seat.addEventListener("click", () => {
+          document.querySelectorAll(".seat").forEach(s => s.classList.remove("selected"));
+          seat.classList.add("selected");
+          selectedSeat = seat.textContent;
+          seatPrice = seat.dataset.price;
+          payBtn.style.display = "block";
+        });
+        seatsContainer.appendChild(seat);
+      }
+    }
+
+    payBtn.addEventListener("click", () => {
+      if (!selectedSeat) return;
+
+      const razorpayLink = seatPrice == 50 
+        ? "https://rzp.io/rzp/Q3W64IW9" 
+        : "https://rzp.io/rzp/nQryg1Y";
+
+      window.open(razorpayLink, "_blank");
+
+      // Wait 8 seconds then download ticket
+      setTimeout(() => {
+        const link = document.createElement("a");
+        const ticketText = `
+🎬 ${ticketTitle}
+🎟️ Seat: ${selectedSeat}
+🕒 Showtime: ${showtimeEl.textContent}
+💰 Price: ₹${seatPrice}
+✅ Booking Confirmed
+        `;
+        const blob = new Blob([ticketText], { type: "text/plain" });
+        link.href = URL.createObjectURL(blob);
+        link.download = `${ticketTitle}_Ticket_${selectedSeat}.txt`;
+        link.click();
+      }, 8000);
+    });
+
+    loadMovie();
   </script>
-</head>
-<body style="font-family: Arial; padding: 20px;">
-  <h2 id="movieTitle">Loading...</h2>
-  <img id="poster" src="" alt="Movie Poster" style="max-width: 200px; border-radius: 8px;"><br><br>
-  <p id="showtimeText"></p>
-  <p id="lockMsg" style="color: red;"></p>
-  <div id="seatArea"></div>
-  <br>
-  <p id="selectedSeat"></p>
-  <button id="payBtn" onclick="makePayment()" disabled>Pay & Download Ticket</button>
 </body>
 </html>

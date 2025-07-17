@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Seat Booking - Film Hall</title>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+  apiKey: "AIzaSyCOEWNxz-PSgZd-iE19O8ykM4yCullRVAQ",
+  authDomain: "film-hall-booking.firebaseapp.com",
+  projectId: "film-hall-booking",
+  storageBucket: "film-hall-booking.firebasestorage.app",
+  messagingSenderId: "307732411395",
+  appId: "1:307732411395:web:44377a6f4f30259e7c0a36",
+  measurementId: "G-3HKF4JPPFT"
+}; 
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const movieId = urlParams.get("id");
+    const showtime = urlParams.get("showtime");
+
+    if (!movieId || !showtime) {
+      document.body.innerHTML = "<h3 style='color:red;'>Movie ID and Showtime missing in URL</h3>";
+    } else {
+      const movieTitle = document.getElementById("movieTitle");
+      const posterImg = document.getElementById("poster");
+      const showtimeText = document.getElementById("showtimeText");
+      const seatArea = document.getElementById("seatArea");
+      const paymentBtn = document.getElementById("payBtn");
+
+      let selectedSeat = null;
+      let selectedPrice = 0;
+
+      async function loadMovie() {
+        const docRef = doc(db, "movies", movieId);
+        const docSnap = await getDoc(docRef);
+
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+
+          movieTitle.innerText = data.title;
+          posterImg.src = data.posterURL;
+          showtimeText.innerText = `Showtime: ${showtime}`;
+
+          // 🕒 Booking Lock Logic
+          const showTime24Hr = convertTo24Hr(showtime);
+          const showDateTime = new Date();
+          showDateTime.setDate(showDateTime.getDate() + 1); // Tomorrow
+          const [hr, min] = showTime24Hr.split(":");
+          showDateTime.setHours(parseInt(hr));
+          showDateTime.setMinutes(parseInt(min));
+          showDateTime.setSeconds(0);
+
+          const lockTime = new Date(showDateTime.getTime() - 2 * 60 * 60 * 1000);
+          const now = new Date();
+
+          if (now < new Date(new Date().setHours(12, 0, 0, 0))) {
+            document.getElementById("lockMsg").innerText = "Booking will open today at 12:00 PM.";
+            paymentBtn.disabled = true;
+            return;
+          }
+
+          if (now > lockTime) {
+            document.getElementById("lockMsg").innerText = "Booking closed 2 hours before showtime.";
+            paymentBtn.disabled = true;
+            return;
+          }
+
+          // ✅ Load seat layout
+          renderSeats(data.priceA, data.priceB);
+        }
+      }
+
+      function renderSeats(priceA, priceB) {
+        for (let i = 1; i <= 50; i++) {
+          const seat = document.createElement("button");
+          seat.innerText = `A${i}`;
+          seat.style.margin = "5px";
+          seat.style.background = "#e0f7fa";
+          seat.onclick = () => selectSeat(`A${i}`, priceA);
+          seatArea.appendChild(seat);
+        }
+        seatArea.appendChild(document.createElement("br"));
+        for (let i = 1; i <= 50; i++) {
+          const seat = document.createElement("button");
+          seat.innerText = `B${i}`;
+          seat.style.margin = "5px";
+          seat.style.background = "#ffe0b2";
+          seat.onclick = () => selectSeat(`B${i}`, priceB);
+          seatArea.appendChild(seat);
+        }
+      }
+
+      function selectSeat(seatId, price) {
+        selectedSeat = seatId;
+        selectedPrice = price;
+        document.getElementById("selectedSeat").innerText = `Selected Seat: ${seatId} | ₹${price}`;
+        document.getElementById("payBtn").disabled = false;
+      }
+
+      window.makePayment = function () {
+        if (!selectedSeat) return alert("Please select a seat.");
+
+        // Redirect to Razorpay payment link based on seat type
+        let paymentLink = selectedSeat.startsWith("A")
+          ? "https://rzp.io/rzp/Q3W64IW9"
+          : "https://rzp.io/rzp/nQryg1Y";
+
+        // Optional: Append seat info in link or store to Firestore later
+        window.open(paymentLink, "_blank");
+
+        alert(`🎟️ Ticket booked for ${selectedSeat} at ₹${selectedPrice}`);
+      };
+
+      function convertTo24Hr(timeStr) {
+        const [time, modifier] = timeStr.split(/(?<=\d)(AM|PM)/);
+        let [hours, minutes] = time.split(":");
+        if (!minutes) minutes = "00";
+        if (modifier === "PM" && hours !== "12") hours = parseInt(hours) + 12;
+        if (modifier === "AM" && hours === "12") hours = "00";
+        return `${hours}:${minutes}`;
+      }
+
+      loadMovie();
+    }
+  </script>
+</head>
+<body style="font-family: Arial; padding: 20px;">
+  <h2 id="movieTitle">Loading...</h2>
+  <img id="poster" src="" alt="Movie Poster" style="max-width: 200px; border-radius: 8px;"><br><br>
+  <p id="showtimeText"></p>
+  <p id="lockMsg" style="color: red;"></p>
+  <div id="seatArea"></div>
+  <br>
+  <p id="selectedSeat"></p>
+  <button id="payBtn" onclick="makePayment()" disabled>Pay & Download Ticket</button>
+</body>
+</html>

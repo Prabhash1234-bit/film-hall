@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Theatre Owner Dashboard</title>
+  <script type="module">
+    // Firebase SDK imports
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+    import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
+
+    // Firebase config
+    const firebaseConfig = {
+  apiKey: "AIzaSyCOEWNxz-PSgZd-iE19O8ykM4yCullRVAQ",
+  authDomain: "film-hall-booking.firebaseapp.com",
+  projectId: "film-hall-booking",
+  storageBucket: "film-hall-booking.firebasestorage.app",
+  messagingSenderId: "307732411395",
+  appId: "1:307732411395:web:44377a6f4f30259e7c0a36",
+  measurementId: "G-3HKF4JPPFT"
+};
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const storage = getStorage(app);
+
+    window.uploadMovie = async function () {
+      const title = document.getElementById("title").value.trim();
+      const file = document.getElementById("poster").files[0];
+      const showtimeCheckboxes = document.querySelectorAll("input[name='showtime']:checked");
+      const priceA = parseInt(document.getElementById("priceA").value);
+      const priceB = parseInt(document.getElementById("priceB").value);
+      const statusMsg = document.getElementById("uploadStatus");
+
+      // Clear previous status
+      statusMsg.textContent = "";
+      statusMsg.style.color = "black";
+
+      if (!title || !file || showtimeCheckboxes.length === 0 || !priceA || !priceB) {
+        statusMsg.style.color = "red";
+        statusMsg.textContent = "⚠️ Please fill in all fields and select at least one showtime.";
+        return;
+      }
+
+      const selectedShowtimes = Array.from(showtimeCheckboxes).map(cb => cb.value);
+      const storageRef = ref(storage, 'posters/' + Date.now() + "_" + file.name);
+      const uploadTask = uploadBytesResumable(storageRef, file);
+
+      uploadTask.on('state_changed', 
+        () => {}, 
+        (error) => {
+          console.error(error);
+          statusMsg.style.color = "red";
+          statusMsg.textContent = "❌ Error uploading poster.";
+        }, 
+        () => {
+          getDownloadURL(uploadTask.snapshot.ref).then((downloadURL) => {
+            addDoc(collection(db, "movies"), {
+              title,
+              showtimes: selectedShowtimes,
+              priceA,
+              priceB,
+              posterURL: downloadURL
+            }).then(() => {
+              statusMsg.style.color = "green";
+              statusMsg.textContent = "✅ Poster uploaded successfully!";
+
+              // Reset form
+              document.getElementById("title").value = "";
+              document.getElementById("poster").value = "";
+              document.getElementById("priceA").value = "50";
+              document.getElementById("priceB").value = "100";
+              document.querySelectorAll("input[name='showtime']").forEach(cb => cb.checked = false);
+            });
+          });
+        }
+      );
+    };
+  </script>
+</head>
+<body style="font-family: Arial; padding: 20px;">
+  <h2>Theatre Owner Movie Upload</h2>
+
+  <label>🎬 Movie Title:</label><br>
+  <input type="text" id="title" placeholder="Enter movie name"><br><br>
+
+  <label>🖼️ Upload Poster:</label><br>
+  <input type="file" id="poster" accept="image/*"><br><br>
+
+  <label>🕒 Select Showtimes:</label><br>
+  <label><input type="checkbox" name="showtime" value="11AM"> 11AM</label><br>
+  <label><input type="checkbox" name="showtime" value="2PM"> 2PM</label><br>
+  <label><input type="checkbox" name="showtime" value="5PM"> 5PM</label><br>
+  <label><input type="checkbox" name="showtime" value="8PM"> 8PM</label><br><br>
+
+  <label>💺 Price for A Seats (₹):</label><br>
+  <input type="number" id="priceA" value="50"><br><br>
+
+  <label>💺 Price for B Seats (₹):</label><br>
+  <input type="number" id="priceB" value="100"><br><br>
+
+  <button onclick="uploadMovie()">📤 Upload Movie</button>
+  <p id="uploadStatus" style="margin-top: 10px; font-weight: bold;"></p>
+</body>
+</html>

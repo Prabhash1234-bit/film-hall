@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Admin Dashboard - Film Hall</title>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    h2 {
+      text-align: center;
+    }
+    .movie {
+      background: white;
+      margin: 10px 0;
+      padding: 15px;
+      border-radius: 10px;
+      box-shadow: 0 0 5px #ccc;
+    }
+    .poster {
+      width: 100px;
+      height: auto;
+      border-radius: 5px;
+    }
+    .details {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+    .info {
+      flex-grow: 1;
+    }
+    button {
+      padding: 5px 10px;
+      border: none;
+      background: #007bff;
+      color: white;
+      cursor: pointer;
+      border-radius: 5px;
+    }
+    button:hover {
+      background: #0056b3;
+    }
+  </style>
+</head>
+<body>
+  <h2>🎬 Admin Dashboard – All Theatre Uploads</h2>
+  <div id="movieList"></div>
+
+  <script>
+    const firebaseConfig = {
+  apiKey: "AIzaSyCOEWNxz-PSgZd-iE19O8ykM4yCullRVAQ",
+  authDomain: "film-hall-booking.firebaseapp.com",
+  projectId: "film-hall-booking",
+  storageBucket: "film-hall-booking.firebasestorage.app",
+  messagingSenderId: "307732411395",
+  appId: "1:307732411395:web:44377a6f4f30259e7c0a36",
+  measurementId: "G-3HKF4JPPFT"
+}; 
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    const movieList = document.getElementById("movieList");
+
+    db.collection("movies").get().then(snapshot => {
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        const container = document.createElement("div");
+        container.className = "movie";
+        container.innerHTML = `
+          <div class="details">
+            <img src="${data.posterURL}" class="poster" />
+            <div class="info">
+              <h3>${data.title}</h3>
+              <p><strong>Showtimes:</strong> ${Array.isArray(data.showtimes) ? data.showtimes.join(', ') : data.showtime}</p>
+              <p><strong>Price:</strong> ₹${data.price}</p>
+              <p><strong>Theatre ID:</strong> ${doc.id}</p>
+              <button onclick="viewBookings('${doc.id}')">View Booked Seats</button>
+            </div>
+          </div>
+        `;
+        movieList.appendChild(container);
+      });
+    });
+
+    function viewBookings(movieId) {
+      window.location.href = `viewer-seat-booking.html?id=${movieId}`;
+    }
+  </script>
+</body>
+</html>

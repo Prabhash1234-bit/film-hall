@@ -1,119 +1,111 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Admin Dashboard</title>
+  <title>Admin Dashboard – Film Hall</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <style>
     body {
-      font-family: Arial, sans-serif;
+      font-family: sans-serif;
       padding: 20px;
-      background: #f0f0f0;
+      background-color: #f2f2f2;
     }
-    h1, h2 {
-      color: #222;
-    }
-    #movieContainer img {
-      border-radius: 8px;
-      margin-bottom: 8px;
+    h1 {
+      color: #333;
     }
     .movie-card {
-      background: white;
-      padding: 12px;
-      border-radius: 8px;
-      margin-bottom: 15px;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      background-color: white;
+      border-radius: 10px;
+      padding: 15px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .movie-card img {
+      max-width: 100%;
+      border-radius: 10px;
+    }
+    .section {
+      margin-top: 40px;
     }
   </style>
-  <!-- ✅ Firebase SDK -->
-  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
 </head>
 <body>
+  <h1>🎬 Admin Dashboard – Film Hall</h1>
+  <div id="movieListSection" class="section">
+    <h2>📽️ All Uploaded Movies</h2>
+    <div id="movieList"></div>
+  </div>
 
-  <h1>🎬 Admin Dashboard</h1>
+  <div id="bookingListSection" class="section">
+    <h2>🎟️ All Bookings</h2>
+    <div id="bookingList"></div>
+  </div>
 
-  <h2>🎞️ Uploaded Movies</h2>
-  <div id="movieContainer">Loading movies...</div>
-
-  <h2>📋 Booking Report</h2>
-  <div id="bookingContainer">Loading bookings...</div>
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
 
   <script>
-    // ✅ Replace with your actual Firebase config
+    // ✅ Your Firebase Config (replace with yours if different)
     const firebaseConfig = {
-      apiKey: "YOUR_API_KEY",
-      authDomain: "YOUR_AUTH_DOMAIN",
+      apiKey: "AIzaSyDv-JLrETzC2gP-t8rpkF38eFYrZBZJAfk",
+      authDomain: "film-hall-booking.firebaseapp.com",
       projectId: "film-hall-booking",
       storageBucket: "film-hall-booking.appspot.com",
-      messagingSenderId: "YOUR_SENDER_ID",
-      appId: "YOUR_APP_ID"
+      messagingSenderId: "204917283350",
+      appId: "1:204917283350:web:df48fc1f5bd0c9cd155844"
     };
+
+    // Initialize Firebase
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
 
-    const movieContainer = document.getElementById("movieContainer");
-    const bookingContainer = document.getElementById("bookingContainer");
-
-    const movieTitlesMap = {};
-
-    // ✅ Load movies
-    db.collection("movies").get().then(snapshot => {
-      movieContainer.innerHTML = "";
-      snapshot.forEach(doc => {
-        const data = doc.data();
-        movieTitlesMap[doc.id] = data.title;
-
-        const movieCard = `
-          <div class="movie-card">
-            <img src="${data.posterURL}" width="150">
-            <h3>${data.title}</h3>
-            <p><strong>Showtimes:</strong> ${Array.isArray(data.showtimes) ? data.showtimes.join(', ') : data.showtimes}</p>
-            <p><strong>Price:</strong> ₹${data.price}</p>
-          </div>
-        `;
-        movieContainer.innerHTML += movieCard;
-      });
-
-      // After loading movie titles, load bookings
-      loadBookings();
-    });
-
-    // ✅ Load bookings
-    function loadBookings() {
-      db.collection("bookings").get().then(snapshot => {
-        if (snapshot.empty) {
-          bookingContainer.innerHTML = "No bookings yet.";
-          return;
-        }
-
-        let totalRevenue = 0;
-        bookingContainer.innerHTML = "";
-
+    // ✅ Load Movies
+    function loadMovies() {
+      db.collection("movies").get().then(snapshot => {
+        const movieList = document.getElementById("movieList");
+        movieList.innerHTML = "";
         snapshot.forEach(doc => {
-          const data = doc.data();
-          const movieTitle = movieTitlesMap[data.movieId] || "Unknown Movie";
-          const seatCount = data.seats.length;
-          const revenue = seatCount * data.price;
-          totalRevenue += revenue;
-
-          const bookingHTML = `
-            <div class="movie-card">
-              <h3>${movieTitle} – ${data.showtime}</h3>
-              <p><strong>Seats Booked:</strong> ${data.seats.join(', ')}</p>
-              <p><strong>Per Seat Price:</strong> ₹${data.price}</p>
-              <p><strong>Booking Revenue:</strong> ₹${revenue}</p>
-            </div>
+          const movie = doc.data();
+          const div = document.createElement("div");
+          div.className = "movie-card";
+          div.innerHTML = `
+            <h3>${movie.title}</h3>
+            <img src="${movie.posterURL}" alt="Poster" />
+            <p><strong>Showtimes:</strong> ${movie.showtimes?.join(", ")}</p>
+            <p><strong>Price:</strong> ₹${movie.price}</p>
           `;
-          bookingContainer.innerHTML += bookingHTML;
+          movieList.appendChild(div);
         });
-
-        bookingContainer.innerHTML += `
-          <h3 style="margin-top: 20px;">💰 Total Revenue: ₹${totalRevenue}</h3>
-        `;
-      }).catch(err => {
-        bookingContainer.innerHTML = "Error loading bookings: " + err.message;
       });
     }
-  </script>
 
+    // ✅ Load Bookings
+    function loadBookings() {
+      db.collection("bookings").orderBy("timestamp", "desc").get().then(snapshot => {
+        const bookingList = document.getElementById("bookingList");
+        bookingList.innerHTML = "";
+        snapshot.forEach(doc => {
+          const booking = doc.data();
+          const div = document.createElement("div");
+          div.className = "movie-card";
+          div.innerHTML = `
+            <p><strong>Movie:</strong> ${booking.title}</p>
+            <p><strong>Showtime:</strong> ${booking.showtime}</p>
+            <p><strong>Seat:</strong> ${booking.seat}</p>
+            <p><strong>Price:</strong> ₹${booking.price}</p>
+            <p><strong>User:</strong> ${booking.userEmail || "N/A"}</p>
+            <p><strong>Time:</strong> ${new Date(booking.timestamp?.seconds * 1000).toLocaleString()}</p>
+          `;
+          bookingList.appendChild(div);
+        });
+      });
+    }
+
+    // Initial calls
+    loadMovies();
+    loadBookings();
+  </script>
 </body>
 </html>

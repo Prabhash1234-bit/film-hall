@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Admin Dashboard – Film Hall</title>
+  <style>
+    body {
+      font-family: Arial;
+      background: #f0f0f0;
+      padding: 20px;
+    }
+    h1 {
+      color: #333;
+    }
+    .movie-card {
+      background: #fff;
+      padding: 15px;
+      margin-bottom: 15px;
+      border-radius: 10px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    .movie-card img {
+      width: 100px;
+      height: auto;
+      border-radius: 8px;
+    }
+  </style>
+</head>
+<body>
+  <h1>🎬 Admin Dashboard – All Movies</h1>
+  <div id="movieContainer">Loading movies...</div>
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+
+  <script>
+    const firebaseConfig = {
+  apiKey: "AIzaSyCOEWNxz-PSgZd-iE19O8ykM4yCullRVAQ",
+  authDomain: "film-hall-booking.firebaseapp.com",
+  projectId: "film-hall-booking",
+  storageBucket: "film-hall-booking.firebasestorage.app",
+  messagingSenderId: "307732411395",
+  appId: "1:307732411395:web:44377a6f4f30259e7c0a36",
+  measurementId: "G-3HKF4JPPFT"
+};
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    const container = document.getElementById("movieContainer");
+    container.innerHTML = "";
+
+    db.collection("movies").get().then(snapshot => {
+      if (snapshot.empty) {
+        container.innerHTML = "No movies found.";
+        return;
+      }
+
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        const html = `
+          <div class="movie-card">
+            <h3>${data.title}</h3>
+            <p><strong>Showtimes:</strong> ${data.showtimes ? data.showtimes.join(', ') : data.showtime}</p>
+            <p><strong>Price:</strong> ₹${data.price}</p>
+            <img src="${data.posterURL}" alt="${data.title}">
+          </div>
+        `;
+        container.innerHTML += html;
+      });
+    }).catch(error => {
+      container.innerHTML = "Error loading movies: " + error;
+    });
+  </script>
+</body>
+</html>

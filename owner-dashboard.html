@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Theatre Owner Dashboard</title>
+  <meta charset="UTF-8">
+</head>
+<body>
+  <h2>🎬 Welcome Theatre Owner</h2>
+  <div id="form-section" style="display:none;">
+    <input type="text" id="title" placeholder="Movie Title"><br><br>
+    <input type="text" id="showtimes" placeholder="Showtimes (e.g., 11AM, 2PM)"><br><br>
+    <input type="number" id="price" placeholder="Ticket Price"><br><br>
+    <input type="file" id="poster"><br><br>
+    <button onclick="uploadMovie()">Upload Movie</button>
+    <p id="message"></p>
+  </div>
+
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-storage-compat.js"></script>
+
+  <script>
+    // ✅ Your Firebase config
+    const firebaseConfig = {
+  apiKey: "AIzaSyCOEWNxz-PSgZd-iE19O8ykM4yCullRVAQ",
+  authDomain: "film-hall-booking.firebaseapp.com",
+  projectId: "film-hall-booking",
+  storageBucket: "film-hall-booking.firebasestorage.app",
+  messagingSenderId: "307732411395",
+  appId: "1:307732411395:web:44377a6f4f30259e7c0a36",
+  measurementId: "G-3HKF4JPPFT"
+}; 
+
+    // ✅ Initialize Firebase
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+    const storage = firebase.storage();
+
+    // ✅ Check user login
+    auth.onAuthStateChanged(user => {
+      if (user) {
+        document.getElementById("form-section").style.display = "block";
+      } else {
+        window.location.href = "owner-login.html";
+      }
+    });
+
+    // ✅ Upload movie data
+    function uploadMovie() {
+      const title = document.getElementById("title").value;
+      const showtimes = document.getElementById("showtimes").value.split(',').map(s => s.trim());
+      const price = parseInt(document.getElementById("price").value);
+      const poster = document.getElementById("poster").files[0];
+
+      if (!title || !showtimes || !price || !poster) {
+        alert("Please fill all fields");
+        return;
+      }
+
+      const storageRef = storage.ref('posters/' + Date.now() + '_' + poster.name);
+      storageRef.put(poster).then(snapshot => {
+        return snapshot.ref.getDownloadURL();
+      }).then(url => {
+        return db.collection("movies").add({
+          title,
+          showtimes,
+          price,
+          posterURL: url
+        });
+      }).then(() => {
+        document.getElementById("message").innerText = "✅ Movie uploaded successfully!";
+      }).catch(error => {
+        document.getElementById("message").innerText = "❌ Error: " + error.message;
+      });
+    }
+  </script>
+</body>
+</html>

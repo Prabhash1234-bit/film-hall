@@ -1,95 +1,99 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="UTF-8">
-  <title>Film Hall Booking</title>
-  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+  <title>🎬 Film Hall | Book Your Ticket</title>
+  <script src="https://www.gstatic.com/firebasejs/10.3.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.3.1/firebase-firestore-compat.js"></script>
   <style>
     body {
-      font-family: Arial, sans-serif;
+      font-family: Arial;
+      background: #f7f7f7;
       padding: 20px;
     }
+    h2 {
+      color: #222;
+    }
     select {
-      margin-bottom: 20px;
-      padding: 10px;
+      padding: 8px;
       font-size: 16px;
     }
-    .movie {
-      border: 1px solid #ccc;
-      margin-bottom: 20px;
-      padding: 10px;
+    .movie-card {
+      background: #fff;
+      padding: 15px;
+      margin: 10px 0;
       border-radius: 10px;
+      box-shadow: 0 0 5px rgba(0,0,0,0.1);
     }
-    .movie img {
-      width: 100%;
-      max-width: 300px;
+    .movie-card img {
+      max-width: 200px;
+      border-radius: 10px;
     }
   </style>
 </head>
 <body>
-
-  <h2>🎥 Welcome to Film Hall</h2>
-  <p>Select a Theatre:</p>
+  <h2>🎟️ Select Your Theatre</h2>
   <select id="theatreSelect">
-    <option value="">-- Choose Theatre --</option>
+    <option value="">-- Choose a theatre --</option>
   </select>
 
   <div id="movieList"></div>
 
   <script>
-    // 🔐 Your Firebase config
+    // ✅ Firebase Config
     const firebaseConfig = {
-      apiKey: "AIzaSyCyHt7uB5FG06U1mYyi8tVWkMufWwDP7Q8",
-      authDomain: "geometric-bolt-436910-h2.firebaseapp.com",
-      projectId: "geometric-bolt-436910-h2",
-      storageBucket: "geometric-bolt-436910-h2.appspot.com",
-      messagingSenderId: "309504865367",
-      appId: "1:309504865367:web:a408f1f396cb5ee1be1b61"
-    };
+  apiKey: "AIzaSyCOEWNxz-PSgZd-iE19O8ykM4yCullRVAQ",
+  authDomain: "film-hall-booking.firebaseapp.com",
+  projectId: "film-hall-booking",
+  storageBucket: "film-hall-booking.firebasestorage.app",
+  messagingSenderId: "307732411395",
+  appId: "1:307732411395:web:44377a6f4f30259e7c0a36",
+  measurementId: "G-3HKF4JPPFT"
+};
 
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
 
-    const theatreSelect = document.getElementById("theatreSelect");
-    const movieList = document.getElementById("movieList");
+    const theatreSelect = document.getElementById('theatreSelect');
+    const movieList = document.getElementById('movieList');
 
-    // 🔽 Load theatre list into dropdown
+    // ✅ Load Theatres
     db.collection("theatres").get().then(snapshot => {
       snapshot.forEach(doc => {
-        const option = document.createElement("option");
-        option.value = doc.id;
-        option.textContent = doc.data().name;
-        theatreSelect.appendChild(option);
+        const opt = document.createElement('option');
+        opt.value = doc.id;
+        opt.textContent = doc.data().name;
+        theatreSelect.appendChild(opt);
       });
     });
 
-    // 🎬 Load movies when theatre selected
-    theatreSelect.addEventListener("change", () => {
+    // ✅ On Theatre Change, Load Movies
+    theatreSelect.addEventListener('change', async () => {
+      const selectedTheatre = theatreSelect.value;
       movieList.innerHTML = "";
-      const theatreId = theatreSelect.value;
-      if (!theatreId) return;
 
-      db.collection("theatres").doc(theatreId).collection("movies").get()
-        .then(snapshot => {
-          if (snapshot.empty) {
-            movieList.innerHTML = "<p>No movies found for this theatre.</p>";
-            return;
-          }
-          snapshot.forEach(doc => {
-            const movie = doc.data();
-            const div = document.createElement("div");
-            div.className = "movie";
-            div.innerHTML = `
-              <h3>${movie.title}</h3>
-              <img src="${movie.posterURL}" alt="${movie.title}" />
-              <p>Price: ₹${movie.price}</p>
-              <p>Showtimes: ${movie.showtimes.join(", ")}</p>
-              <a href="seat-booking.html?theatreId=${theatreId}&movieId=${doc.id}">🎟 Book Now</a>
-            `;
-            movieList.appendChild(div);
-          });
+      if (selectedTheatre) {
+        const movieSnap = await db.collection("movies")
+          .where("theatreId", "==", selectedTheatre).get();
+
+        if (movieSnap.empty) {
+          movieList.innerHTML = "<p>No movies found for this theatre.</p>";
+          return;
+        }
+
+        movieSnap.forEach(doc => {
+          const data = doc.data();
+          const div = document.createElement('div');
+          div.className = "movie-card";
+          div.innerHTML = `
+            <img src="${data.posterURL}" alt="${data.title}"><br>
+            <strong>${data.title}</strong><br>
+            Showtimes: ${data.showtimes.join(", ")}<br>
+            Price: ₹${data.price}<br>
+            <a href="seat-booking.html?id=${doc.id}">Book Now</a>
+          `;
+          movieList.appendChild(div);
         });
+      }
     });
   </script>
 </body>

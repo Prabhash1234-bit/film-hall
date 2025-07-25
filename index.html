@@ -1,130 +1,96 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Film Hall - Movie List</title>
+  <meta charset="UTF-8">
+  <title>Film Hall Booking</title>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
   <style>
     body {
       font-family: Arial, sans-serif;
       padding: 20px;
-      background: #f5f5f5;
-    }
-    .movie-card {
-      border: 1px solid #ccc;
-      border-radius: 12px;
-      padding: 16px;
-      margin-bottom: 20px;
-      background: white;
-      box-shadow: 0 0 10px rgba(0,0,0,0.1);
-    }
-    .movie-card img {
-      max-width: 200px;
-      border-radius: 10px;
-    }
-    .movie-info {
-      display: flex;
-      gap: 20px;
-      align-items: center;
-    }
-    .movie-actions {
-      margin-top: 10px;
     }
     select {
-      padding: 5px;
+      margin-bottom: 20px;
+      padding: 10px;
+      font-size: 16px;
     }
-    button {
-      padding: 6px 12px;
-      border: none;
-      background: #007BFF;
-      color: white;
-      border-radius: 6px;
-      cursor: pointer;
+    .movie {
+      border: 1px solid #ccc;
+      margin-bottom: 20px;
+      padding: 10px;
+      border-radius: 10px;
+    }
+    .movie img {
+      width: 100%;
+      max-width: 300px;
     }
   </style>
 </head>
 <body>
 
-<h2>Select a Theatre</h2>
-<select id="theatreDropdown">
-  <option value="">-- Select Theatre --</option>
-</select>
+  <h2>🎥 Welcome to Film Hall</h2>
+  <p>Select a Theatre:</p>
+  <select id="theatreSelect">
+    <option value="">-- Choose Theatre --</option>
+  </select>
 
-<div id="movieList"></div>
+  <div id="movieList"></div>
 
-<!-- Firebase SDKs -->
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js"></script>
-
-<script>
+  <script>
+    // 🔐 Your Firebase config
     const firebaseConfig = {
-  apiKey: "AIzaSyCOEWNxz-PSgZd-iE19O8ykM4yCullRVAQ",
-  authDomain: "film-hall-booking.firebaseapp.com",
-  projectId: "film-hall-booking",
-  storageBucket: "film-hall-booking.firebasestorage.app",
-  messagingSenderId: "307732411395",
-  appId: "1:307732411395:web:44377a6f4f30259e7c0a36",
-  measurementId: "G-3HKF4JPPFT"
-};
+      apiKey: "AIzaSyCyHt7uB5FG06U1mYyi8tVWkMufWwDP7Q8",
+      authDomain: "geometric-bolt-436910-h2.firebaseapp.com",
+      projectId: "geometric-bolt-436910-h2",
+      storageBucket: "geometric-bolt-436910-h2.appspot.com",
+      messagingSenderId: "309504865367",
+      appId: "1:309504865367:web:a408f1f396cb5ee1be1b61"
+    };
 
-  // Initialize
-  const app = firebase.initializeApp(firebaseConfig);
-  const db = firebase.firestore();
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
 
-  const theatreDropdown = document.getElementById('theatreDropdown');
-  const movieList = document.getElementById('movieList');
+    const theatreSelect = document.getElementById("theatreSelect");
+    const movieList = document.getElementById("movieList");
 
-  // Load theatre options
-  async function loadTheatres() {
-    const snapshot = await db.collection('theatres').get();
-    snapshot.forEach(doc => {
-      const option = document.createElement('option');
-      option.value = doc.id;
-      option.textContent = doc.data().name;
-      theatreDropdown.appendChild(option);
+    // 🔽 Load theatre list into dropdown
+    db.collection("theatres").get().then(snapshot => {
+      snapshot.forEach(doc => {
+        const option = document.createElement("option");
+        option.value = doc.id;
+        option.textContent = doc.data().name;
+        theatreSelect.appendChild(option);
+      });
     });
-  }
 
-  // Load movies for selected theatre
-  async function loadMovies(theatreId) {
-    movieList.innerHTML = '';
-    const snapshot = await db.collection('theatres').doc(theatreId).collection('movies').get();
-    snapshot.forEach(doc => {
-      const data = doc.data();
-      const movieCard = document.createElement('div');
-      movieCard.className = 'movie-card';
-      movieCard.innerHTML = `
-        <div class="movie-info">
-          <img src="${data.posterURL}" alt="${data.title}" />
-          <div>
-            <h3>${data.title}</h3>
-            <p>Price: ₹${data.price}</p>
-            <label>Showtime:
-              <select>
-                ${data.showtimes.map(show => `<option value="${show}">${show}</option>`).join('')}
-              </select>
-            </label>
-            <div class="movie-actions">
-              <button onclick="bookTicket('${theatreId}', '${doc.id}')">Book Now</button>
-            </div>
-          </div>
-        </div>
-      `;
-      movieList.appendChild(movieCard);
+    // 🎬 Load movies when theatre selected
+    theatreSelect.addEventListener("change", () => {
+      movieList.innerHTML = "";
+      const theatreId = theatreSelect.value;
+      if (!theatreId) return;
+
+      db.collection("theatres").doc(theatreId).collection("movies").get()
+        .then(snapshot => {
+          if (snapshot.empty) {
+            movieList.innerHTML = "<p>No movies found for this theatre.</p>";
+            return;
+          }
+          snapshot.forEach(doc => {
+            const movie = doc.data();
+            const div = document.createElement("div");
+            div.className = "movie";
+            div.innerHTML = `
+              <h3>${movie.title}</h3>
+              <img src="${movie.posterURL}" alt="${movie.title}" />
+              <p>Price: ₹${movie.price}</p>
+              <p>Showtimes: ${movie.showtimes.join(", ")}</p>
+              <a href="seat-booking.html?theatreId=${theatreId}&movieId=${doc.id}">🎟 Book Now</a>
+            `;
+            movieList.appendChild(div);
+          });
+        });
     });
-  }
-
-  function bookTicket(theatreId, movieId) {
-    window.location.href = `seat-booking.html?theatre=${theatreId}&movie=${movieId}`;
-  }
-
-  theatreDropdown.addEventListener('change', () => {
-    const selectedTheatre = theatreDropdown.value;
-    if (selectedTheatre) {
-      loadMovies(selectedTheatre);
-    }
-  });
-
-  loadTheatres();
-</script>
-
+  </script>
 </body>
 </html>

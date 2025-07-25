@@ -1,30 +1,26 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="UTF-8" />
   <title>Seat Booking</title>
+  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.9.3/html2pdf.bundle.min.js"></script>
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
   <style>
-    body { font-family: Arial, sans-serif; text-align: center; }
-    .seat { display: inline-block; width: 40px; height: 40px; margin: 4px; background-color: #ddd; line-height: 40px; cursor: pointer; }
-    .selected { background-color: green; color: white; }
-    .booked { background-color: red; cursor: not-allowed; }
+    body { font-family: Arial; text-align: center; }
+    .seat { display: inline-block; margin: 5px; padding: 10px; border-radius: 5px; cursor: pointer; }
+    .seat.available { background: #90ee90; }
+    .seat.booked { background: #d3d3d3; cursor: not-allowed; }
+    .seat.selected { background: #ffa500; }
   </style>
 </head>
 <body>
-  <h1 id="movieTitle">Loading...</h1>
-  <p id="showtime"></p>
-  <p id="price"></p>
-  <div id="seats"></div>
-  <button id="payBtn" style="margin-top:20px;">Pay & Book</button>
-
-  <!-- Firebase SDK -->
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <h2>Seat Booking</h2>
+  <div id="movieInfo"></div>
+  <div id="seatLayout"></div>
+  <button onclick="bookNow()">Book Now</button>
 
   <script>
-    // ✅ Replace with your actual Firebase config
     const firebaseConfig = {
   apiKey: "AIzaSyCOEWNxz-PSgZd-iE19O8ykM4yCullRVAQ",
   authDomain: "film-hall-booking.firebaseapp.com",
@@ -33,128 +29,125 @@
   messagingSenderId: "307732411395",
   appId: "1:307732411395:web:44377a6f4f30259e7c0a36",
   measurementId: "G-3HKF4JPPFT"
-}; 
-
-    // ✅ Initialize Firebase
+};
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
 
-    const urlParams = new URLSearchParams(window.location.search);
-    const movieId = urlParams.get("id");
-    const selectedShowtime = urlParams.get("show"); // e.g., 2PM
+    const movieId = new URLSearchParams(window.location.search).get("id");
+    let selectedSeat = null;
+    let currentMovie = null;
 
-    let movieData = null;
-    let selectedSeats = [];
+    const seatLayoutDiv = document.getElementById("seatLayout");
+    const seatPriceMap = {}; // Stores price per seat (A=₹50, B=₹100)
 
-    async function loadMovie() {
-      const doc = await db.collection("movies").doc(movieId).get();
-      movieData = doc.data();
+    // Build seat layout
+    function renderSeats(bookedSeats = []) {
+      seatLayoutDiv.innerHTML = "";
+      for (let row of ["A", "B"]) {
+        for (let i = 1; i <= 50; i++) {
+          const seatNum = row + i;
+          const seat = document.createElement("div");
+          seat.className = "seat";
+          seat.textContent = seatNum;
+          seat.classList.add("available");
 
-      document.getElementById("movieTitle").innerText = movieData.title;
-      document.getElementById("showtime").innerText = `Showtime: ${selectedShowtime}`;
-      document.getElementById("price").innerText = `Price: ₹${movieData.price}`;
+          if (row === "A") seatPriceMap[seatNum] = 50;
+          if (row === "B") seatPriceMap[seatNum] = 100;
 
-      // Booking lock: Disable booking if less than 2hrs before show
-      const tomorrow = new Date();
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      const [timeStr, period] = selectedShowtime.match(/(\d+)(AM|PM)/i).slice(1);
-      let hour = parseInt(timeStr);
-      if (period === "PM" && hour !== 12) hour += 12;
-
-      const showDateTime = new Date(tomorrow);
-      showDateTime.setHours(hour, 0, 0);
-
-      const now = new Date();
-      const diff = (showDateTime - now) / (1000 * 60 * 60);
-
-      if (now.getHours() < 12) {
-        alert("Booking opens today at 12 PM");
-        document.getElementById("payBtn").disabled = true;
-        return;
-      }
-
-      if (diff < 2) {
-        alert("Booking closed 2 hours before showtime.");
-        document.getElementById("payBtn").disabled = true;
-        return;
-      }
-
-      renderSeats();
-    }
-
-    function renderSeats() {
-      const container = document.getElementById("seats");
-      const booked = movieData.bookings?.[selectedShowtime] || [];
-
-      for (let i = 1; i <= 100; i++) {
-        const seat = i <= 50 ? `A${i}` : `B${i - 50}`;
-        const div = document.createElement("div");
-        div.className = "seat";
-        div.innerText = seat;
-
-        if (booked.includes(seat)) {
-          div.classList.add("booked");
+          if (bookedSeats.includes(seatNum)) {
+            seat.classList.remove("available");
+            seat.classList.add("booked");
+          } else {
+            seat.addEventListener("click", () => {
+              document.querySelectorAll(".seat.selected").forEach(s => s.classList.remove("selected"));
+              seat.classList.add("selected");
+              selectedSeat = seatNum;
+            });
+          }
+          seatLayoutDiv.appendChild(seat);
         }
-
-        div.addEventListener("click", () => {
-          if (div.classList.contains("booked")) return;
-
-          div.classList.toggle("selected");
-          const index = selectedSeats.indexOf(seat);
-          if (index >= 0) selectedSeats.splice(index, 1);
-          else selectedSeats.push(seat);
-        });
-
-        container.appendChild(div);
+        seatLayoutDiv.appendChild(document.createElement("br"));
       }
     }
 
-    document.getElementById("payBtn").onclick = async () => {
-      if (selectedSeats.length === 0) return alert("Select at least one seat.");
-      const total = movieData.price * selectedSeats.length;
+    // Fetch movie data
+    db.collection("movies").doc(movieId).get().then(doc => {
+      currentMovie = doc.data();
+      document.getElementById("movieInfo").innerHTML = `
+        <h3>${currentMovie.title}</h3>
+        <p>Showtime: ${currentMovie.showtime}</p>
+        <p>Price: ₹${currentMovie.price}</p>
+      `;
+      fetchBookedSeats(currentMovie.showtime);
+    });
 
-      const razorpayOptions = {
-        key: "rzp_test_GAiEEXi5SvLscR", // ✅ Replace with your Razorpay key
-        amount: total * 100,
+    function fetchBookedSeats(showtime) {
+      db.collection("bookings")
+        .where("movieId", "==", movieId)
+        .where("showtime", "==", showtime)
+        .get()
+        .then(snapshot => {
+          const bookedSeats = snapshot.docs.map(doc => doc.data().seatNumber);
+          renderSeats(bookedSeats);
+        });
+    }
+
+    function bookNow() {
+      if (!selectedSeat) return alert("Please select a seat.");
+
+      const price = seatPriceMap[selectedSeat];
+      const options = {
+        key: "rzp_test_GAiEEXi5SvLscR",
+        amount: price * 100,
         currency: "INR",
         name: "Film Hall",
-        description: `Booking for ${movieData.title}`,
-        handler: async function (response) {
-          // Mark seats as booked
-          const ref = db.collection("movies").doc(movieId);
-          await db.runTransaction(async (tx) => {
-            const snap = await tx.get(ref);
-            const data = snap.data();
-            const current = data.bookings?.[selectedShowtime] || [];
-            const updated = [...new Set([...current, ...selectedSeats])];
-            tx.update(ref, {
-              [`bookings.${selectedShowtime}`]: updated
-            });
-          });
-
-          generatePDF(movieData.title, selectedShowtime, selectedSeats, total);
+        description: "Movie Ticket",
+        handler: function (response) {
+          saveBooking(price);
         },
+        prefill: { name: "User", email: "user@example.com" },
         theme: { color: "#3399cc" }
       };
-
-      const rzp = new Razorpay(razorpayOptions);
+      const rzp = new Razorpay(options);
       rzp.open();
-    };
-
-    function generatePDF(title, time, seats, price) {
-      const { jsPDF } = window.jspdf;
-      const doc = new jsPDF();
-      doc.setFontSize(16);
-      doc.text("🎟️ Film Hall Ticket", 20, 20);
-      doc.setFontSize(12);
-      doc.text(`Movie: ${title}`, 20, 40);
-      doc.text(`Showtime: ${time}`, 20, 50);
-      doc.text(`Seats: ${seats.join(", ")}`, 20, 60);
-      doc.text(`Total: ₹${price}`, 20, 70);
-      doc.save("ticket.pdf");
     }
 
-    loadMovie();
+    function saveBooking(price) {
+      const bookingData = {
+        movieId: movieId,
+        movieTitle: currentMovie.title,
+        showtime: currentMovie.showtime,
+        seatNumber: selectedSeat,
+        seatType: price === 50 ? "₹50" : "₹100",
+        price: price,
+        bookingTime: new Date()
+      };
+      db.collection("bookings").add(bookingData).then(() => {
+        generateTicket(bookingData);
+      });
+    }
+
+    function generateTicket(data) {
+      const ticketContent = `
+        <div style="padding:20px;font-family:Arial">
+          <h2>🎟️ Film Hall Ticket</h2>
+          <p><strong>Movie:</strong> ${data.movieTitle}</p>
+          <p><strong>Showtime:</strong> ${data.showtime}</p>
+          <p><strong>Seat:</strong> ${data.seatNumber}</p>
+          <p><strong>Type:</strong> ${data.seatType}</p>
+          <p><strong>Price:</strong> ₹${data.price}</p>
+          <p>Thank you for booking with Film Hall!</p>
+        </div>
+      `;
+      const opt = {
+        margin: 0,
+        filename: `Ticket_${data.seatNumber}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: {},
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      };
+      html2pdf().from(ticketContent).set(opt).save();
+    }
   </script>
 </body>
 </html>

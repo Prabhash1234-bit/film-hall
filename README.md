@@ -14,6 +14,35 @@ This is the user-facing web application for **Film Hall**, an online ticket book
 👉 [Visit Film Hall Booking System](https://Prabhash1234-bit.github.io/film-hall/)
 
 ## 📁 Project Structure
+public/
+├── index.html
+├── seat-booking.html
+├── ticket.html
+├── login.html
+├── owner-dashboard.html
+├── js/
+│   ├── firebase-config.js
+│   ├── auth.js
+│   ├── upload.js
+│   ├── index.js
+│   ├── booking.js
+├── css/
+│   └── style.css
+
+
+Firestore DB:
+├── theatres (Collection)
+│   └── <theatre_id> (Document)
+│       ├── name: "Film Hall 1"
+│       ├── ownerEmail: "owner1@example.com"
+│       └── movies (Subcollection)
+│           └── <movie_id>
+│               ├── title
+│               ├── showtimes [ ]
+│               ├── price
+│               └── posterURL
+├── bookings (Collection)
+│   └── <booking_id>...
 ## 📁 Project Structure
 
 film-hall/
